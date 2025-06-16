@@ -14,7 +14,7 @@ else
         @foreach (var manga in mangaList)
         {
             <li class="manga-item">
-                <img src="https://mangareader-c0th.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.thumb)" alt="@manga.title" />
+                <img src="https://mangareader-2.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.thumb)" alt="@manga.title" />
                 <div class="manga-info">
                     <strong>@manga.title</strong>
                     <p class="description">@Truncate(manga.description, 100)</p>
