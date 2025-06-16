@@ -1,9 +1,14 @@
 const express = require('express');
+const puppeteer = require('puppeteer');
 const https = require('https');
 const axios = require('axios');
-const cors = require('cors');
-const bodyParser = require("body-parser");
 require('dotenv').config();
+
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+
+const app = express();
+const bodyParser = require("body-parser");
+const cors = require('cors');
 
 // Middleware and routes
 const ApiKey = require("./middleware/apiKeyMiddleware");
@@ -14,37 +19,123 @@ const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
 
-const app = express();
+// Global Puppeteer instance
+let browser;
 
+// Start Puppeteer at server startup
+(async () => {
+    browser = await puppeteer.launch({
+        headless: 'new',
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-accelerated-2d-canvas',
+            '--disable-gpu',
+            '--no-zygote',
+            '--single-process',
+            '--disable-background-timer-throttling',
+            '--disable-renderer-backgrounding',
+            '--disable-backgrounding-occluded-windows',
+        ]
+    });
+
+    const PORT = process.env.PORT || 10000;
+
+    app.listen(PORT, '0.0.0.0', () => {
+        console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
+    });
+})();
+
+const maxRedirects = 5;
+async function fetchWithRedirects(url, redirectCount = 0) {
+    if (redirectCount > maxRedirects) {
+        throw new Error("Too many redirects");
+    }
+
+    const response = await axios.get(url, {
+        responseType: 'stream',
+        maxRedirects: 0,
+        headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
+            'Referer': 'https://www.mangakakalot.gg',
+            'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Connection': 'keep-alive',
+            'Cache-Control': 'no-cache',
+            'Pragma': 'no-cache',
+        },
+        httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+        validateStatus: status => (status >= 200 && status < 400)
+    });
+
+    if (response.status >= 300 && response.status < 400) {
+        const redirectUrl = response.headers.location;
+        if (!redirectUrl) throw new Error("Redirect location header missing");
+        const newUrl = new URL(redirectUrl, url).href;
+        return fetchWithRedirects(newUrl, redirectCount + 1);
+    }
+
+    return response;
+}
+
+// 🔧 Image proxy route using shared Puppeteer browser
+app.get('/api/imageProxy', async (req, res) => {
+    const imageUrl = req.query.url;
+
+    if (!imageUrl || !imageUrl.startsWith('http')) {
+        return res.status(400).send("Invalid or missing 'url' parameter.");
+    }
+
+    try {
+        const page = await browser.newPage();
+
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+        await page.setExtraHTTPHeaders({
+            'Referer': 'https://www.mangakakalot.gg',
+        });
+
+        await page.goto(imageUrl, { waitUntil: 'networkidle2' });
+
+        const imageBuffer = await page.evaluate(async () => {
+            const res = await fetch(window.location.href);
+            const buf = await res.arrayBuffer();
+            return Array.from(new Uint8Array(buf));
+        });
+
+        await page.close();
+
+        const ext = imageUrl.split('.').pop().toLowerCase();
+        const contentType = {
+            webp: 'image/webp',
+            png: 'image/png',
+            gif: 'image/gif',
+            jpg: 'image/jpeg',
+            jpeg: 'image/jpeg',
+        }[ext] || 'image/jpeg';
+
+        res.set('Content-Type', contentType);
+        res.send(Buffer.from(imageBuffer));
+    } catch (err) {
+        console.error("Puppeteer proxy error:", err);
+        res.status(500).send("Image proxy error.");
+    }
+});
+
+// 🔐 CORS (adjust to actual frontend URL)
 app.use(cors({
-    origin: 'https://mangareader-1.onrender.com', // Remove trailing slash
+    origin: 'https://mangareader-1.onrender.com/',
     methods: ['GET'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
+// Body parser
 app.use(bodyParser.json());
 
-// 🔐 Protect routes with API Key
+// API key middleware
 app.use(ApiKey);
 
-// 📚 Main routes
+// Routes
 app.use("/api/manga", mangaRouter);
 app.use("/api/search", mangaSearch);
 app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
-
-// 🖼 Image proxy using Cloudflare Worker
-app.get('/api/imageProxy', (req, res) => {
-    const imageUrl = req.query.url;
-    if (!imageUrl || !imageUrl.startsWith("http")) {
-        return res.status(400).send("Invalid 'url' parameter.");
-    }
-
-    const proxyUrl = `https://green-cloud-fef8.stilhofsvej46.workers.dev/?url=${encodeURIComponent(imageUrl)}`;
-    res.redirect(proxyUrl);
-});
-
-// 🚀 Start server
-const PORT = process.env.PORT || 10000;
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
-});
