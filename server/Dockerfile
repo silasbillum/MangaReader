@@ -25,7 +25,7 @@ RUN npx puppeteer browsers install chrome
 COPY . .
 
 # Expose your app port
-EXPOSE 3000
+EXPOSE 10000
 
 # Start your app
 CMD ["node", "app.js"]
