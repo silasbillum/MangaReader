@@ -1,7 +1,6 @@
-# Start from Node image
 FROM node:18-slim
 
-# Install dependencies for Puppeteer/Chromium
+# Install system dependencies for Chromium
 RUN apt-get update && apt-get install -y \
     wget ca-certificates fonts-liberation libasound2 libatk1.0-0 libc6 \
     libcairo2 libcups2 libdbus-1-3 libexpat1 libfontconfig1 libgcc1 \
@@ -10,18 +9,15 @@ RUN apt-get update && apt-get install -y \
     libxfixes3 libxi6 libxrandr2 libxrender1 libxss1 libxtst6 lsb-release \
     xdg-utils --no-install-recommends && rm -rf /var/lib/apt/lists/*
 
-# Set working directory
 WORKDIR /app
 
-# Copy package.json and install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Copy your app source
+# 👇 Force Puppeteer to download its bundled Chrome
+RUN npx puppeteer browsers install chrome
+
 COPY . .
 
-# Expose your backend port (adjust if needed)
 EXPOSE 3000
-
-# Start your server
 CMD ["node", "app.js"]
