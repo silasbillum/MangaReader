@@ -61,48 +61,60 @@ app.get('/api/imageProxy', async (req, res) => {
     }
 
     let browser;
-    try {
-        browser = await puppeteer.launch({
-            args: ['--no-sandbox', '--disable-setuid-sandbox'] // required on some environments
+    
+        (async () => {
+            browser = await puppeteer.launch({
+                headless: 'new',
+                args: [
+                    '--no-sandbox',
+                    '--disable-setuid-sandbox',
+                    '--disable-dev-shm-usage',
+                    '--disable-accelerated-2d-canvas',
+                    '--disable-gpu',
+                    '--no-zygote',
+                    '--single-process',
+                    '--disable-background-timer-throttling',
+                    '--disable-renderer-backgrounding',
+                    '--disable-backgrounding-occluded-windows',
+                ]
+            });
+
+            try {
+                const page = await browser.newPage();
+
+                await page.setUserAgent('Mozilla/5.0 (...)');
+                await page.setExtraHTTPHeaders({
+                    'Referer': 'https://www.mangakakalot.gg',
+                });
+
+                await page.goto(imageUrl, { waitUntil: 'networkidle2' });
+
+                const imageBuffer = await page.evaluate(async () => {
+                    const res = await fetch(window.location.href);
+                    const buf = await res.arrayBuffer();
+                    return Array.from(new Uint8Array(buf));
+                });
+
+                await page.close();
+
+                const ext = imageUrl.split('.').pop().toLowerCase();
+                const contentType = {
+                    webp: 'image/webp',
+                    png: 'image/png',
+                    gif: 'image/gif'
+                }[ext] || 'image/jpeg';
+
+                res.set('Content-Type', contentType);
+                res.send(Buffer.from(imageBuffer));
+            } catch (err) {
+                console.error("Puppeteer error:", err.message);
+                res.status(500).send("Image proxy error.");
+            }
         });
-        const page = await browser.newPage();
-
-        // Set user agent and referer (optional but can help bypass blocks)
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
-        await page.setExtraHTTPHeaders({
-            'Referer': 'https://www.mangakakalot.gg',
-        });
-
-        await page.goto(imageUrl, { waitUntil: 'networkidle2' });
-
-        // Extract image buffer
-        const imageBuffer = await page.evaluate(async () => {
-            const response = await fetch(window.location.href);
-            const buffer = await response.arrayBuffer();
-            return Array.from(new Uint8Array(buffer));
-        });
-
-        // Detect content-type from URL extension (optional improvement)
-        const ext = imageUrl.split('.').pop().toLowerCase();
-        let contentType = 'image/jpeg';
-        if (ext === 'webp') contentType = 'image/webp';
-        else if (ext === 'png') contentType = 'image/png';
-        else if (ext === 'gif') contentType = 'image/gif';
-
-        res.set('Content-Type', contentType);
-        res.send(Buffer.from(imageBuffer));
-
-    } catch (error) {
-        console.error("❌ Puppeteer proxy error:", error);
-        res.status(500).send("Image proxy error.");
-    } finally {
-        if (browser) await browser.close();
-    }
-});
 const cors = require('cors');
 
 app.use(cors({
-    origin: 'https://localhost:5001', // Change to your Blazor app URL & port
+    origin: 'https://mangareader-3./', // Change to your Blazor app URL & port
     methods: ['GET'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
