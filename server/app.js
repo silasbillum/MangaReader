@@ -1,7 +1,8 @@
 const express = require('express');
 const puppeteer = require('puppeteer');
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
+const axios = require('axios');
+const https = require('https');
 const ApiKey = require("./middleware/apiKeyMiddleware");
 const app = express();
 const bodyParser = require("body-parser");
@@ -14,6 +15,19 @@ const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware
 const ListManga = require('./controllers/ListMangaController');
 
 app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
+
+
+const browser = await puppeteer.launch({
+    headless: true,
+    args: [
+        "--no-sandbox",
+        "--disable-setuid-sandbox",
+        "--disable-dev-shm-usage",
+        "--disable-gpu",
+        "--no-zygote",
+        "--single-process"
+    ]
+});
 
 const maxRedirects = 5; // Prevent infinite redirect loops
 
@@ -54,55 +68,34 @@ async function fetchWithRedirects(url, redirectCount = 0) {
 }
 
 app.get('/api/imageProxy', async (req, res) => {
-    const imageUrl = req.query.url;
-
-    if (!imageUrl || !imageUrl.startsWith('http')) {
-        return res.status(400).send("Invalid or missing 'url' parameter.");
+    const { url: imageUrl } = req.query;
+    if (!imageUrl?.startsWith('http')) {
+        return res.status(400).send("Invalid 'url'");
     }
 
-    let browser;
     try {
-        browser = await puppeteer.launch({
-            args: ['--no-sandbox', '--disable-setuid-sandbox'] // required on some environments
-        });
-        const page = await browser.newPage();
-
-        // Set user agent and referer (optional but can help bypass blocks)
-        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36');
-        await page.setExtraHTTPHeaders({
-            'Referer': 'https://www.mangakakalot.gg',
-        });
-
-        await page.goto(imageUrl, { waitUntil: 'networkidle2' });
-
-        // Extract image buffer
-        const imageBuffer = await page.evaluate(async () => {
-            const response = await fetch(window.location.href);
-            const buffer = await response.arrayBuffer();
-            return Array.from(new Uint8Array(buffer));
+        const response = await axios.get(imageUrl, {
+            responseType: 'arraybuffer',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) ' +
+                    'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115 Safari/537.36',
+                'Referer': 'https://www.mangakakalot.gg',
+                'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
+            },
+            httpsAgent: new https.Agent({ rejectUnauthorized: false }),
         });
 
-        // Detect content-type from URL extension (optional improvement)
-        const ext = imageUrl.split('.').pop().toLowerCase();
-        let contentType = 'image/jpeg';
-        if (ext === 'webp') contentType = 'image/webp';
-        else if (ext === 'png') contentType = 'image/png';
-        else if (ext === 'gif') contentType = 'image/gif';
-
-        res.set('Content-Type', contentType);
-        res.send(Buffer.from(imageBuffer));
-
-    } catch (error) {
-        console.error("❌ Puppeteer proxy error:", error);
-        res.status(500).send("Image proxy error.");
-    } finally {
-        if (browser) await browser.close();
+        res.set('Content-Type', response.headers['content-type'] || 'image/jpeg');
+        res.send(response.data);
+    } catch (err) {
+        console.error("🔁 Axios image fetch failed:", err.message);
+        res.status(500).send("Image proxy error");
     }
 });
 const cors = require('cors');
 
 app.use(cors({
-    origin: 'https://localhost:5001', // Change to your Blazor app URL & port
+    origin: 'https://mangareader-2./', // Change to your Blazor app URL & port
     methods: ['GET'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
