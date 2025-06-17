@@ -21,9 +21,8 @@ const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware
 const ListManga = require('./controllers/ListMangaController');
 const { LRUCache } = require('lru-cache');
 
-const mangaRoutes = require('./routes/manga');
-app.use('/api/manga', mangaRoutes);
 
+app.use("/api/manga", mangaRouter);
 
 const imageCache = new LRUCache({
     max: 500,
