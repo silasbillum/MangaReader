@@ -21,6 +21,10 @@ const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware
 const ListManga = require('./controllers/ListMangaController');
 const { LRUCache } = require('lru-cache');
 
+const mangaRoutes = require('./routes/manga');
+app.use('/api/manga', mangaRoutes);
+
+
 const imageCache = new LRUCache({
     max: 500,
     ttl: 1000 * 60 * 10, // 10 minutes
@@ -144,10 +148,6 @@ app.get('/api/imageProxy', async (req, res) => {
         res.status(500).send("Image proxy error.");
     }
 });
-const httpReq = require("request-promise");
-const cheerio = require("cheerio");
-
-
 
 module.exports = router;
 

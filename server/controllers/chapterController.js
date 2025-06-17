@@ -1,5 +1,4 @@
 const cheerio = require("cheerio")
-req.chapterList = chapterList;
 
 
 const chapterController = (req, res) => {

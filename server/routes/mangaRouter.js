@@ -1,27 +1,14 @@
-const mangaExist = require("../middleware/manga/mangaExistMiddleware")
-const mangaController = require("../controllers/mangaController")
-const chapterList = require("../middleware/manga/chapterList")
-const chapterController = require("../controllers/chapterController")
-const chapterExist = require("../middleware/manga/chapterExistMiddleware")
-
 const express = require('express');
-const router = express.Router();
+const mangaExist = require("../middleware/manga/mangaExistMiddleware");
+const chapterExist = require("../middleware/manga/chapterExistMiddleware");
+const mangaController = require("../controllers/mangaController");
+const chapterController = require("../controllers/chapterController");
 const httpReq = require('request-promise');
 const cheerio = require('cheerio');
 
-const manga = require("express").Router()
+const manga = express.Router();
 
-manga.get("/:id",
-    mangaExist,
-    chapterList,
-    mangaController
-)
-
-manga.get("/:id/:ch",
-    chapterExist,
-    chapterController
-)
-
+// Utility function to scrape chapters
 const scrapeChapterList = async (title) => {
     const url = `https://www.mangakakalot.gg/manga/${title}`;
     const html = await httpReq(url);
@@ -34,23 +21,17 @@ const scrapeChapterList = async (title) => {
     })).get();
 };
 
-
-router.get('/api/manga/:title', async (req, res) => {
-    const title = req.params.title;
-
+// GET single manga details
+manga.get("/:id", mangaExist, async (req, res) => {
     try {
-        // Scrape chapter list first
-        const chapterList = await scrapeChapterList(title);
-
-        // Fetch manga page HTML
+        const title = req.params.id;
         const url = `https://www.mangakakalot.gg/manga/${title}`;
         const html = await httpReq(url);
+        const chapterList = await scrapeChapterList(title);
 
-        // Attach data to req for mangaController
         req.html = html;
         req.chapterList = chapterList;
 
-        // Call mangaController to parse and send JSON response
         mangaController(req, res);
     } catch (err) {
         console.error(err);
@@ -58,4 +39,19 @@ router.get('/api/manga/:title', async (req, res) => {
     }
 });
 
-module.exports = manga
+// GET specific chapter
+manga.get("/:id/:ch", chapterExist, async (req, res) => {
+    try {
+        const { id, ch } = req.params;
+        const url = `https://www.mangakakalot.gg/manga/${id}/chapter_${ch}`;
+        const html = await httpReq(url);
+
+        req.html = html;
+        chapterController(req, res);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch chapter' });
+    }
+});
+
+module.exports = manga;
