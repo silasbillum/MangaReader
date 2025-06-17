@@ -8,7 +8,6 @@ const express = require('express');
 const router = express.Router();
 const httpReq = require('request-promise');
 const cheerio = require('cheerio');
-const mangaController = require('../controllers/mangaController');
 
 const manga = require("express").Router()
 
