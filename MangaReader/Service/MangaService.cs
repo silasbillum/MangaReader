@@ -12,10 +12,15 @@ namespace MangaReader.Service
 
         public async Task<List<Manga>> GetMangaListAsync(int page = 1)
         {
-            //https://mangareader-c0th.onrender.com/api/mangaList?type=hot-manga&page={page}
             var url = $"https://mangareader-3.onrender.com/api/mangaList?type=hot-manga&page={page}";
             var result = await _httpClient.GetFromJsonAsync<MangaListResponse>(url);
             return result?.MangaList ?? new List<Manga>();
+        }
+
+        public async Task<MangaDetail> GetMangaDetailAsync(string id)
+        {
+            var url = $"https://mangareader-3.onrender.com/api/manga/{id}";
+            return await _httpClient.GetFromJsonAsync<MangaDetail>(url);
         }
 
     }

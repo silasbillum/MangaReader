@@ -1,0 +1,60 @@
+﻿@page "/manga/{id}"
+@using MangaReader.DomainModels
+@using Service
+@inject MangaService MangaService
+
+<h3>@manga?.Title</h3>
+
+@if (manga == null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <img src="@manga.CoverImage" alt="@manga.Title" width="200" />
+
+    <div class="author">
+        <strong>Author(s):</strong>
+        @foreach (var author in manga.Authors)
+        {
+            <span>@author</span>
+
+            @(author != manga.Authors.Last() ? ", " : "")
+        }
+    </div>
+
+    <div class="status">
+        <strong>Status:</strong> @manga.Status
+    </div>
+
+    <div class="genres">
+        <strong>Genres:</strong> @string.Join(", ", manga.Genres)
+    </div>
+
+    <div class="summary">
+        <strong>Description:</strong>
+        <p>@manga.Description</p>
+    </div>
+
+    <h4>Chapters</h4>
+    <ul>
+        @foreach (var chapter in manga.Chapters)
+        {
+            <li>
+                <a href="@chapter.Url" target="_blank">@chapter.Title</a>
+            </li>
+        }
+    </ul>
+}
+
+@code {
+    [Parameter]
+    public string id { get; set; }
+
+    private MangaDetail? manga;
+
+    protected override async Task OnInitializedAsync()
+    {
+        manga = await MangaService.GetMangaDetailAsync(id);
+    }
+}

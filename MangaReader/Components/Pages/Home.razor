@@ -86,8 +86,17 @@ else
 
     private void NavigateToDetail(string title)
     {
-        var encoded = Uri.EscapeDataString(title);
-        Navigation.NavigateTo($"/manga/{encoded}");
+        var slug = title
+            .ToLower()
+            .Replace(":", "")               // remove special characters you don't want
+            .Replace(",", "")
+            .Replace(".", "")
+            .Replace("'", "")
+            .Replace("!", "")
+            .Replace("&", "and")
+            .Replace(" ", "-");            // replace spaces with dashes
+
+        Navigation.NavigateTo($"/manga/{slug}");
     }
 
     private string Truncate(string text, int length)
