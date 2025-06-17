@@ -5,10 +5,13 @@ const axios = require('axios');
 require('dotenv').config();
 
 process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
-
+const express = require('express');
+const router = express.Router();
 const app = express();
 const bodyParser = require("body-parser");
 const cors = require('cors');
+const httpReq = require('request-promise');
+const mangaController = require('./controllers/mangaController'); // your manga detail controller
 
 // Middleware and routes
 const ApiKey = require("./middleware/apiKeyMiddleware");
@@ -143,6 +146,46 @@ app.get('/api/imageProxy', async (req, res) => {
         res.status(500).send("Image proxy error.");
     }
 });
+const httpReq = require("request-promise");
+const cheerio = require("cheerio");
+const scrapeChapterList = async (title) => {
+    const url = `https://www.mangakakalot.gg/manga/${title}`;
+    const html = await httpReq(url);
+    const $ = cheerio.load(html);
+
+    return $(".chapter-list a").map((i, el) => ({
+        id: $(el).attr('href').split('/').pop(),
+        name: $(el).text().trim(),
+        path: $(el).attr('href'),
+    })).get();
+};
+
+
+router.get('/api/manga/:title', async (req, res) => {
+    const title = req.params.title;
+
+    try {
+        // Scrape chapter list first
+        const chapterList = await scrapeChapterList(title);
+
+        // Fetch manga page HTML
+        const url = `https://www.mangakakalot.gg/manga/${title}`;
+        const html = await httpReq(url);
+
+        // Attach data to req for mangaController
+        req.html = html;
+        req.chapterList = chapterList;
+
+        // Call mangaController to parse and send JSON response
+        mangaController(req, res);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: 'Failed to fetch manga details' });
+    }
+});
+
+module.exports = router;
+
 
 
 // 🔐 CORS (adjust to actual frontend URL)
