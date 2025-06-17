@@ -18,8 +18,13 @@ const mangaSearch = require("./routes/mangaSearch");
 const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
-const LRU = require('lru-cache');
-const imageCache = new LRU({ max: 500, maxAge: 1000 * 60 * 10 });
+const { LRUCache } = require('lru-cache');
+
+const imageCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 10, // 10 minutes
+});
+
 const mangaListCache = new LRU({ max: 300, maxAge: 1000 * 60 * 5 });
 
 let browser;
