@@ -9,7 +9,6 @@ const router = express.Router();
 const app = express();
 const bodyParser = require("body-parser");
 const cors = require('cors');
-const httpReq = require('request-promise');
 const mangaController = require('./controllers/mangaController'); // your manga detail controller
 
 // Middleware and routes
