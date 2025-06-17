@@ -1,18 +1,7 @@
 const cheerio = require("cheerio")
-const chapterList = await scrapeChapterList(title);
 req.chapterList = chapterList;
 
-const scrapeChapterList = async (title) => {
-    const url = `https://www.mangakakalot.gg/manga/${title}`;
-    const html = await httpReq(url);
-    const $ = cheerio.load(html);
 
-    return $(".chapter-list a").map((i, el) => ({
-        id: $(el).attr('href').split('/').pop(),
-        name: $(el).text().trim(),
-        path: $(el).attr('href'),
-    })).get();
-};
 const chapterController = (req, res) => {
 
     const $ = cheerio.load(req.html)
