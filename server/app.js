@@ -161,18 +161,20 @@ app.use(ApiKey);
 // Routes
 app.use("/api/manga", mangaRouter);
 app.use("/api/search", mangaSearch);
-app.get('/api/mangaList', dataCollector, pagesValidation, async (req, res, next) => {
+app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
+app.get('/api/mangaList/raw', async (req, res, next) => {
     const key = `${req.query.type || 'hot'}_${req.query.page || 1}`;
     const cached = mangaListCache.get(key);
     if (cached) return res.json(cached);
 
     try {
-        const data = await ListManga(req, res, true); // assuming it returns data when third param is true
+        const data = await ListManga(req, res, true);
         mangaListCache.set(key, data);
         res.json(data);
     } catch (err) {
         next(err);
     }
 });
+
 
 
