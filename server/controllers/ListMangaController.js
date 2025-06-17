@@ -1,7 +1,6 @@
 ﻿const httpReq = require("request-promise");
 const cheerio = require("cheerio");
 const urlLink = "https://www.mangakakalot.gg";
-const scrapeMangaList = require('../utils/scrapeMangaList'); // adjust path as needed
 
 const ListManga = async (req, res) => {
     try {
@@ -54,16 +53,4 @@ const ListManga = async (req, res) => {
     }
 };
 
-module.exports = async function ListManga(req, res, returnDataOnly = false) {
-    const page = parseInt(req.query.page) || 1;
-    const type = req.query.type || 'hot-manga';
-
-    const mangaList = await scrapeMangaList(type, page); // however you collect it
-
-    const response = { page, mangaList };
-
-    if (returnDataOnly) return response;
-
-    res.json(response);
-};
-
+module.exports = ListManga;
