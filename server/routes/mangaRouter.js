@@ -8,12 +8,10 @@ const cheerio = require('cheerio');
 
 const manga = express.Router();
 
-// Utility function to scrape chapters
 const scrapeChapterList = async (title) => {
     const url = `https://www.mangakakalot.gg/manga/${title}`;
     const html = await httpReq(url);
     const $ = cheerio.load(html);
-
     return $(".chapter-list a").map((i, el) => ({
         id: $(el).attr('href').split('/').pop(),
         name: $(el).text().trim(),
@@ -21,45 +19,43 @@ const scrapeChapterList = async (title) => {
     })).get();
 };
 
-// GET single manga details
+// GET manga details
 manga.get("/:id", mangaExist, async (req, res) => {
     const title = req.params.id;
-    console.log(`🔍 Fetching manga: ${title}`);
+    console.log("➡️ Received request for manga:", title);
 
     try {
         const url = `https://www.mangakakalot.gg/manga/${title}`;
+        console.log("🔗 Fetching from:", url);
         const html = await httpReq(url);
-        console.log("✅ Fetched HTML");
+        console.log("📥 HTML fetch successful: length =", html.length);
 
         const chapterList = await scrapeChapterList(title);
-        console.log(`✅ Chapters scraped: ${chapterList.length}`);
+        console.log("🧾 Scraped chapter count:", chapterList.length);
 
         req.html = html;
         req.chapterList = chapterList;
 
         mangaController(req, res);
+        console.log("✅ mangaController executed without errors");
     } catch (err) {
-        console.error("🛑 Error in manga router:", err.message);
-        res.status(500).json({
-            state: 500,
-            message: err.message || 'Something goes wrong',
-        });
+        console.error("💥 Error in manga route:", err);
+        res.status(500).json({ state: 500, message: err.message });
     }
 });
 
 
-// GET specific chapter
+// GET chapter details
 manga.get("/:id/:ch", chapterExist, async (req, res) => {
+    const { id, ch } = req.params;
+    console.log("📘 Chapter route for:", id, ch);
     try {
-        const { id, ch } = req.params;
-        const url = `https://www.mangakakalot.gg/manga/${id}/chapter_${ch}`;
-        const html = await httpReq(url);
-
+        const html = await httpReq(`https://www.mangakakalot.gg/manga/${id}/chapter_${ch}`);
         req.html = html;
         chapterController(req, res);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch chapter' });
+        console.error("❌ Chapter route error:", err);
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -154,7 +154,7 @@ module.exports = router;
 
 // 🔐 CORS (adjust to actual frontend URL)
 app.use(cors({
-    origin: 'https://localhost:5001',
+    origin: 'https://localhost:3000',
     methods: ['GET'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
