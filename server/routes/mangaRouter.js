@@ -1,4 +1,4 @@
-const express = require('express');
+﻿const express = require('express');
 const mangaExist = require("../middleware/manga/mangaExistMiddleware");
 const chapterExist = require("../middleware/manga/chapterExistMiddleware");
 const mangaController = require("../controllers/mangaController");
@@ -23,21 +23,30 @@ const scrapeChapterList = async (title) => {
 
 // GET single manga details
 manga.get("/:id", mangaExist, async (req, res) => {
+    const title = req.params.id;
+    console.log(`🔍 Fetching manga: ${title}`);
+
     try {
-        const title = req.params.id;
         const url = `https://www.mangakakalot.gg/manga/${title}`;
         const html = await httpReq(url);
+        console.log("✅ Fetched HTML");
+
         const chapterList = await scrapeChapterList(title);
+        console.log(`✅ Chapters scraped: ${chapterList.length}`);
 
         req.html = html;
         req.chapterList = chapterList;
 
         mangaController(req, res);
     } catch (err) {
-        console.error(err);
-        res.status(500).json({ error: 'Failed to fetch manga details' });
+        console.error("🛑 Error in manga router:", err.message);
+        res.status(500).json({
+            state: 500,
+            message: err.message || 'Something goes wrong',
+        });
     }
 });
+
 
 // GET specific chapter
 manga.get("/:id/:ch", chapterExist, async (req, res) => {
