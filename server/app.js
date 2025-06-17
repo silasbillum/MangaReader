@@ -25,7 +25,11 @@ const imageCache = new LRUCache({
     ttl: 1000 * 60 * 10, // 10 minutes
 });
 
-const mangaListCache = new LRU({ max: 300, maxAge: 1000 * 60 * 5 });
+const mangaListCache = new LRUCache({
+    max: 300,
+    ttl: 1000 * 60 * 5 // 5 minutes
+});
+
 
 let browser;
 
