@@ -1,6 +1,7 @@
 ﻿const httpReq = require("request-promise");
 const cheerio = require("cheerio");
 const urlLink = "https://www.mangakakalot.gg";
+const scrapeMangaList = require('../utils/scrapeMangaList'); // adjust path as needed
 
 const ListManga = async (req, res) => {
     try {
