@@ -1,62 +1,102 @@
 ﻿const express = require('express');
-const mangaExist = require("../middleware/manga/mangaExistMiddleware");
-const chapterExist = require("../middleware/manga/chapterExistMiddleware");
-const mangaController = require("../controllers/mangaController");
-const chapterController = require("../controllers/chapterController");
-const httpReq = require('request-promise');
-const cheerio = require('cheerio');
+const puppeteer = require('puppeteer');
 
-const manga = express.Router();
+const router = express.Router();
 
-const scrapeChapterList = async (title) => {
-    const url = `https://www.mangakakalot.gg/manga/${title}`;
-    const html = await httpReq(url);
-    const $ = cheerio.load(html);
-    return $(".chapter-list a").map((i, el) => ({
-        id: $(el).attr('href').split('/').pop(),
-        name: $(el).text().trim(),
-        path: $(el).attr('href'),
-    })).get();
-};
+async function scrapeManga(id) {
+  const url = `https://www.mangakakalot.gg/manga/${id}`;
+  let browser;
 
-// GET manga details
-manga.get("/:id", mangaExist, async (req, res) => {
-    const title = req.params.id;
-    console.log("➡️ Received request for manga:", title);
+  try {
+    browser = await puppeteer.launch({
+      headless: true,
+      args: ['--no-sandbox', '--disable-setuid-sandbox'],
+    });
+
+    const page = await browser.newPage();
+      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+
+    // Title
+    const title = await page.$eval('h1', el => el.textContent.trim());
+
+    // Cover image
+      const coverImage = await page.$eval('img.lazy', img => img.src);
+
+
+    // Description
+      const description = await page.$eval('#contentBox', el => {
+          // Get the inner text (with all paragraphs)
+          let text = el.innerText || el.textContent || '';
+
+          // Optional: clean up excessive whitespace and line breaks
+          text = text.replace(/\n+/g, '\n').trim();
+
+          return text;
+      });
+
+
+
+    // Author(s) - often under info items with label "Author(s):"
+      const authors = await page.$$eval('li', lis => {
+          // Find the <li> which contains "Author(s) :"
+          const authorLi = lis.find(li => li.textContent.includes('Author(s) :'));
+          if (!authorLi) return [];
+
+          // Grab all <a> inside that <li> and return their text trimmed
+          return Array.from(authorLi.querySelectorAll('a')).map(a => a.textContent.trim());
+      });
+
+
+    // Status (Ongoing/Completed)
+      const status = await page.$$eval('li', lis => {
+          const statusLi = lis.find(li => li.textContent.includes('Status :'));
+          if (!statusLi) return '';
+          return statusLi.textContent.replace('Status :', '').trim();
+      });
+
+
+    // Genres (array of genre names)
+      const genres = await page.$$eval('.genres a', els => els.map(el => el.textContent.trim()));
+
+
+    // Chapters list (array of { title, url, date })
+      const chapters = await page.$$eval('.chapter-list .row', rows => {
+          return rows.map(row => {
+              const linkEl = row.querySelector('a');
+              const dateEl = row.querySelector('span[title]');
+
+              if (!linkEl || !dateEl) return null;
+
+              return {
+                  title: linkEl.textContent.trim(),
+                  url: linkEl.href,
+                  date: dateEl.getAttribute('title').trim(),
+              };
+          }).filter(Boolean); // Remove any null entries
+      });
+
+
+    await browser.close();
+
+    return { id, title, coverImage, description, authors, status, genres, chapters };
+
+  } catch (error) {
+    if (browser) await browser.close();
+    throw error;
+  }
+}
+
+
+router.get('/manga/:id', async (req, res) => {
+    const mangaId = req.params.id;
 
     try {
-        const url = `https://www.mangakakalot.gg/manga/${title}`;
-        console.log("🔗 Fetching from:", url);
-        const html = await httpReq(url);
-        console.log("📥 HTML fetch successful: length =", html.length);
-
-        const chapterList = await scrapeChapterList(title);
-        console.log("🧾 Scraped chapter count:", chapterList.length);
-
-        req.html = html;
-        req.chapterList = chapterList;
-
-        mangaController(req, res);
-        console.log("✅ mangaController executed without errors");
-    } catch (err) {
-        console.error("💥 Error in manga route:", err);
-        res.status(500).json({ state: 500, message: err.message });
+        const data = await scrapeManga(mangaId);
+        res.json(data);
+    } catch (error) {
+        console.error('Error fetching manga:', error);
+        res.status(500).json({ error: 'Failed to fetch manga data' });
     }
 });
 
-
-// GET chapter details
-manga.get("/:id/:ch", chapterExist, async (req, res) => {
-    const { id, ch } = req.params;
-    console.log("📘 Chapter route for:", id, ch);
-    try {
-        const html = await httpReq(`https://www.mangakakalot.gg/manga/${id}/chapter_${ch}`);
-        req.html = html;
-        chapterController(req, res);
-    } catch (err) {
-        console.error("❌ Chapter route error:", err);
-        res.status(500).json({ error: err.message });
-    }
-});
-
-module.exports = manga;
+module.exports = router;
