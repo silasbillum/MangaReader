@@ -53,4 +53,16 @@ const ListManga = async (req, res) => {
     }
 };
 
-module.exports = ListManga;
+module.exports = async function ListManga(req, res, returnDataOnly = false) {
+    const page = parseInt(req.query.page) || 1;
+    const type = req.query.type || 'hot-manga';
+
+    const mangaList = await scrapeMangaList(type, page); // however you collect it
+
+    const response = { page, mangaList };
+
+    if (returnDataOnly) return response;
+
+    res.json(response);
+};
+
