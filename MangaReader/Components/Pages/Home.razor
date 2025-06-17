@@ -4,9 +4,9 @@
 @inject MangaService MangaService
 @inject NavigationManager Navigation
 
-@if (mangaList == null)
+@if (isLoading)
 {
-    <p>Loading...</p>
+<p>Loading manga list...</p>
 }
 else
 {
@@ -14,7 +14,8 @@ else
         @foreach (var manga in mangaList)
         {
             <li class="manga-item">
-                <img src="https://mangareader-3.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.thumb)" alt="@manga.title" />
+                <img loading="lazy" src="https://mangareader-3.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.thumb)" alt="@manga.title" />
+
                 <div class="manga-info">
                     <strong>@manga.title</strong>
                     <p class="description">@Truncate(manga.description, 100)</p>
@@ -43,17 +44,25 @@ else
     private int currentPage = 1;
     private int totalPages = 2456; // dynamically from API ideally
     private int visiblePageCount = 10;
+    private bool isLoading = false;
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         await LoadPage(currentPage);
     }
 
+
     private async Task LoadPage(int page)
     {
         if (page < 1 || page > totalPages) return;
+        isLoading = true;
+        StateHasChanged();
+
         currentPage = page;
         mangaList = await MangaService.GetMangaListAsync(page);
+
+        isLoading = false;
+        StateHasChanged();
     }
 
     private IEnumerable<int> VisiblePages

@@ -18,8 +18,10 @@ const mangaSearch = require("./routes/mangaSearch");
 const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
+const LRU = require('lru-cache');
+const imageCache = new LRU({ max: 500, maxAge: 1000 * 60 * 10 });
+const mangaListCache = new LRU({ max: 300, maxAge: 1000 * 60 * 5 });
 
-// Global Puppeteer instance
 let browser;
 
 // Start Puppeteer at server startup
@@ -87,9 +89,15 @@ app.get('/api/imageProxy', async (req, res) => {
         return res.status(400).send("Invalid or missing 'url' parameter.");
     }
 
+    // 🚀 Check cache first
+    const cached = imageCache.get(imageUrl);
+    if (cached) {
+        res.set('Content-Type', cached.contentType);
+        return res.send(cached.buffer);
+    }
+
     try {
         const page = await browser.newPage();
-
         await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
         await page.setExtraHTTPHeaders({
             'Referer': 'https://www.mangakakalot.gg',
@@ -114,17 +122,23 @@ app.get('/api/imageProxy', async (req, res) => {
             jpeg: 'image/jpeg',
         }[ext] || 'image/jpeg';
 
+        const buffer = Buffer.from(imageBuffer);
+
+        // 💾 Save to cache
+        imageCache.set(imageUrl, { buffer, contentType });
+
         res.set('Content-Type', contentType);
-        res.send(Buffer.from(imageBuffer));
+        res.send(buffer);
     } catch (err) {
         console.error("Puppeteer proxy error:", err);
         res.status(500).send("Image proxy error.");
     }
 });
 
+
 // 🔐 CORS (adjust to actual frontend URL)
 app.use(cors({
-    origin: 'https://mangareader-1.onrender.com/',
+    origin: 'https://localhost:5001',
     methods: ['GET'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -138,4 +152,16 @@ app.use(ApiKey);
 // Routes
 app.use("/api/manga", mangaRouter);
 app.use("/api/search", mangaSearch);
-app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
+app.get('/api/mangaList', async (req, res, next) => {
+    const key = `${req.query.type || 'hot'}_${req.query.page || 1}`;
+    const cached = mangaListCache.get(key);
+    if (cached) return res.json(cached);
+
+    try {
+        const data = await ListManga(req, res, true); // change ListManga to return the list
+        mangaListCache.set(key, data);
+        res.json(data);
+    } catch (err) {
+        next(err);
+    }
+});
