@@ -2,16 +2,23 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
+
+
 require('dotenv').config();
 
-const { LRUCache } = require('lru-cache');
 const ApiKey = require("./middleware/apiKeyMiddleware");
 const mangaSearch = require("./routes/mangaSearch");
 const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
 
-// Cache setup BEFORE any route definitions
+
+
+const app = express();
+
+
+const { LRUCache } = require('lru-cache');
+
 const imageCache = new LRUCache({
     max: 500,
     ttl: 1000 * 60 * 10, // 10 minutes
@@ -22,9 +29,12 @@ const mangaListCache = new LRUCache({
     ttl: 1000 * 60 * 5, // 5 minutes
 });
 
-const app = express();
+
+
+
 
 (async () => {
+    // Launch Puppeteer browser
     const browser = await puppeteer.launch({
         headless: 'true',
         args: [
@@ -41,27 +51,33 @@ const app = express();
         ],
     });
 
+    // Import mangaRouter AFTER browser is ready
     const mangaRouter = require('./routes/mangaRouter')(browser);
 
+    // Middleware - CORS first
     app.use(cors({
         origin: 'https://localhost:3000',
         methods: ['GET'],
         allowedHeaders: ['Content-Type', 'Authorization']
     }));
 
+    // Body parser
     app.use(bodyParser.json());
+
+    // API Key Middleware
     app.use(ApiKey);
 
+    // Debug logger for manga API routes
     app.use('/api/manga', (req, res, next) => {
         console.log('🔔 Incoming /api/manga request:', req.method, req.originalUrl);
         next();
     });
 
+    // Routes
     app.use('/api/manga', mangaRouter);
     app.use('/api/search', mangaSearch);
 
     app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
-
     app.get('/api/mangaList/raw', async (req, res, next) => {
         const key = `${req.query.type || 'hot'}_${req.query.page || 1}`;
         const cached = mangaListCache.get(key);
@@ -76,6 +92,7 @@ const app = express();
         }
     });
 
+    // Image proxy route using Puppeteer
     app.get('/api/imageProxy', async (req, res) => {
         const imageUrl = req.query.url;
         if (!imageUrl || !imageUrl.startsWith('http')) {
@@ -92,8 +109,10 @@ const app = express();
             const page = await browser.newPage();
             await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
             await page.setExtraHTTPHeaders({ 'Referer': 'https://www.mangakakalot.gg' });
+
             await page.goto(imageUrl, { waitUntil: 'networkidle2' });
 
+            // Fetch image buffer inside the page context
             const imageBuffer = await page.evaluate(async () => {
                 const response = await fetch(window.location.href);
                 const buffer = await response.arrayBuffer();
@@ -111,6 +130,7 @@ const app = express();
                 jpeg: 'image/jpeg',
             };
             const contentType = contentTypeMap[ext] || 'image/jpeg';
+
             const buffer = Buffer.from(imageBuffer);
 
             imageCache.set(imageUrl, { buffer, contentType });
@@ -123,11 +143,25 @@ const app = express();
         }
     });
 
+
+
+    try {
+        console.log('LRUCache keys:', Object.keys(LRUCache));
+    } catch (e) {
+        console.error('Failed to inspect lru-cache export:', e);
+    }
+
+
+    console.log('LRU keys:', Object.keys(require('lru-cache')));
+
+
+    // Start the server AFTER everything is set
     const PORT = process.env.PORT || 10000;
     app.listen(PORT, '0.0.0.0', () => {
         console.log(`🚀 Server running on http://0.0.0.0:${PORT}`);
     });
 
+    // Handle unhandled rejections and exceptions globally
     process.on('unhandledRejection', error => {
         console.error('Unhandled Promise Rejection:', error);
     });

@@ -1,5 +1,6 @@
-﻿const express = require('express');
-const { LRUCache } = require('lru-cache');
+﻿// routes/mangaRouter.js
+const express = require('express');
+const { LRUCache } = require('lru-cache'); // ✅ correct import
 const { performance } = require('perf_hooks');
 
 module.exports = (browser) => {
@@ -51,7 +52,6 @@ module.exports = (browser) => {
         }
     }
 
-    // FIXED this path: now it's /api/manga/:id
     router.get('/:id', async (req, res) => {
         const mangaId = req.params.id;
         const cached = mangaDetailCache.get(mangaId);
