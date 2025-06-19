@@ -15,10 +15,6 @@ const ListManga = require('./controllers/ListMangaController');
 
 const app = express();
 
-console.log('LRU version:', require('lru-cache/package.json').version);
-console.log('LRU keys:', Object.keys(require('lru-cache')));
-
-
 const imageCache = new LRUCache.LRUCache({
     max: 500,
     ttl: 1000 * 60 * 10, // 10 minutes
