@@ -12,12 +12,31 @@ const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
 
+const { LRUCache } = require('lru-cache');
 
 
 const app = express();
 
 
 
+try {
+    console.log('LRUCache keys:', Object.keys(LRUCache));
+} catch (e) {
+    console.error('Failed to inspect lru-cache export:', e);
+}
+
+
+console.log('LRU keys:', Object.keys(require('lru-cache')));
+
+const imageCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 10, // 10 minutes
+});
+
+const mangaListCache = new LRUCache({
+    max: 300,
+    ttl: 1000 * 60 * 5, // 5 minutes
+});
 
 
 
@@ -129,28 +148,6 @@ const app = express();
             console.error("Puppeteer proxy error:", err);
             res.status(500).send("Image proxy error.");
         }
-    });
-
-
-    const { LRUCache } = require('lru-cache');
-
-    try {
-        console.log('LRUCache keys:', Object.keys(LRUCache));
-    } catch (e) {
-        console.error('Failed to inspect lru-cache export:', e);
-    }
-
-
-    console.log('LRU keys:', Object.keys(require('lru-cache')));
-
-    const imageCache = new LRUCache({
-        max: 500,
-        ttl: 1000 * 60 * 10, // 10 minutes
-    });
-
-    const mangaListCache = new LRUCache({
-        max: 300,
-        ttl: 1000 * 60 * 5, // 5 minutes
     });
 
     // Start the server AFTER everything is set
