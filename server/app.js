@@ -2,7 +2,7 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const LRUCache = require('lru-cache');
+const LRUCache = require('lru-cache').default;
 
 require('dotenv').config();
 
