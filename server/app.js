@@ -2,8 +2,7 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const LRUCache = require('lru-cache');
-
+const { LRUCache } = require('lru-cache');
 require('dotenv').config();
 
 const ApiKey = require("./middleware/apiKeyMiddleware");
@@ -44,6 +43,7 @@ const mangaListCache = new LRUCache({
 
     // Import mangaRouter AFTER browser is ready
     const mangaRouter = require('./routes/mangaRouter')(browser);
+    app.use('/api', mangaRouter)
 
     // Middleware - CORS first
     app.use(cors({
