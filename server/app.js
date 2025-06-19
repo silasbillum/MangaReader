@@ -42,7 +42,7 @@ const mangaListCache = new LRUCache({
     });
 
     // Import mangaRouter AFTER browser is ready
-    const mangaRouter = require('./routes/mangaRouter');
+    const mangaRouter = require('./routes/mangaRouter')(browser);
     app.use('/api', mangaRouter)
 
     // Middleware - CORS first
