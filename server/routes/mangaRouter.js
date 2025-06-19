@@ -1,14 +1,13 @@
 ﻿const express = require('express');
-const { LRUCache } = require('lru-cache');
-
+const LRUCache = require('lru-cache');
 const { performance } = require('perf_hooks');
 
 module.exports = (browser) => {
     const router = express.Router();
 
     const mangaDetailCache = new LRUCache({
-        max: 100,
-        ttl: 1000 * 60 * 5, // 5 minutes
+        max: 300,
+        ttl: 1000 * 60 * 10, // 10 mins
     });
 
     async function scrapeManga(id) {
