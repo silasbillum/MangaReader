@@ -2,7 +2,8 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const LRUCache = require('lru-cache').default;
+const LRUCache = require('lru-cache');
+
 
 require('dotenv').config();
 
@@ -14,15 +15,16 @@ const ListManga = require('./controllers/ListMangaController');
 
 const app = express();
 
-const imageCache = new LRUCache({
+const imageCache = new LRUCache.LRUCache({
     max: 500,
     ttl: 1000 * 60 * 10, // 10 minutes
 });
 
-const mangaListCache = new LRUCache({
+const mangaListCache = new LRUCache.LRUCache({
     max: 300,
     ttl: 1000 * 60 * 5, // 5 minutes
 });
+
 
 (async () => {
     // Launch Puppeteer browser
