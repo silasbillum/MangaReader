@@ -4,88 +4,84 @@ const puppeteer = require('puppeteer');
 const router = express.Router();
 
 async function scrapeManga(id) {
-  const url = `https://www.mangakakalot.gg/manga/${id}`;
-  let browser;
+    const url = `https://www.mangakakalot.gg/manga/${id}`;
+    let browser;
 
-  try {
-    browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox', '--disable-setuid-sandbox'],
-    });
+    console.time('total-scrape');
 
-    const page = await browser.newPage();
-      await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+    try {
+        console.time('launch-browser');
+        browser = await puppeteer.launch({
+            headless: true,
+            args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        });
+        console.timeEnd('launch-browser');
 
-    // Title
-    const title = await page.$eval('h1', el => el.textContent.trim());
+        console.time('open-page');
+        const page = await browser.newPage();
+        await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+        console.timeEnd('open-page');
 
-    // Cover image
-      const coverImage = await page.$eval('img.lazy', img => img.src);
+        console.time('scrape-title');
+        const title = await page.$eval('h1', el => el.textContent.trim());
+        console.timeEnd('scrape-title');
 
+        console.time('scrape-cover');
+        const coverImage = await page.$eval('img.lazy', img => img.src);
+        console.timeEnd('scrape-cover');
 
-    // Description
-      const description = await page.$eval('#contentBox', el => {
-          // Get the inner text (with all paragraphs)
-          let text = el.innerText || el.textContent || '';
+        console.time('scrape-description');
+        const description = await page.$eval('#contentBox', el => {
+            let text = el.innerText || el.textContent || '';
+            return text.replace(/\n+/g, '\n').trim();
+        });
+        console.timeEnd('scrape-description');
 
-          // Optional: clean up excessive whitespace and line breaks
-          text = text.replace(/\n+/g, '\n').trim();
+        console.time('scrape-authors');
+        const authors = await page.$$eval('li', lis => {
+            const authorLi = lis.find(li => li.textContent.includes('Author(s) :'));
+            if (!authorLi) return [];
+            return Array.from(authorLi.querySelectorAll('a')).map(a => a.textContent.trim());
+        });
+        console.timeEnd('scrape-authors');
 
-          return text;
-      });
+        console.time('scrape-status');
+        const status = await page.$$eval('li', lis => {
+            const statusLi = lis.find(li => li.textContent.includes('Status :'));
+            return statusLi ? statusLi.textContent.replace('Status :', '').trim() : '';
+        });
+        console.timeEnd('scrape-status');
 
+        console.time('scrape-genres');
+        const genres = await page.$$eval('.genres a', els => els.map(el => el.textContent.trim()));
+        console.timeEnd('scrape-genres');
 
+        console.time('scrape-chapters');
+        const chapters = await page.$$eval('.chapter-list .row', rows => {
+            return rows.map(row => {
+                const linkEl = row.querySelector('a');
+                const dateEl = row.querySelector('span[title]');
+                if (!linkEl || !dateEl) return null;
+                return {
+                    title: linkEl.textContent.trim(),
+                    url: linkEl.href,
+                    date: dateEl.getAttribute('title').trim(),
+                };
+            }).filter(Boolean);
+        });
+        console.timeEnd('scrape-chapters');
 
-    // Author(s) - often under info items with label "Author(s):"
-      const authors = await page.$$eval('li', lis => {
-          // Find the <li> which contains "Author(s) :"
-          const authorLi = lis.find(li => li.textContent.includes('Author(s) :'));
-          if (!authorLi) return [];
+        await browser.close();
+        console.timeEnd('total-scrape');
 
-          // Grab all <a> inside that <li> and return their text trimmed
-          return Array.from(authorLi.querySelectorAll('a')).map(a => a.textContent.trim());
-      });
+        return { id, title, coverImage, description, authors, status, genres, chapters };
 
-
-    // Status (Ongoing/Completed)
-      const status = await page.$$eval('li', lis => {
-          const statusLi = lis.find(li => li.textContent.includes('Status :'));
-          if (!statusLi) return '';
-          return statusLi.textContent.replace('Status :', '').trim();
-      });
-
-
-    // Genres (array of genre names)
-      const genres = await page.$$eval('.genres a', els => els.map(el => el.textContent.trim()));
-
-
-    // Chapters list (array of { title, url, date })
-      const chapters = await page.$$eval('.chapter-list .row', rows => {
-          return rows.map(row => {
-              const linkEl = row.querySelector('a');
-              const dateEl = row.querySelector('span[title]');
-
-              if (!linkEl || !dateEl) return null;
-
-              return {
-                  title: linkEl.textContent.trim(),
-                  url: linkEl.href,
-                  date: dateEl.getAttribute('title').trim(),
-              };
-          }).filter(Boolean); // Remove any null entries
-      });
-
-
-    await browser.close();
-
-    return { id, title, coverImage, description, authors, status, genres, chapters };
-
-  } catch (error) {
-    if (browser) await browser.close();
-    throw error;
-  }
+    } catch (error) {
+        if (browser) await browser.close();
+        console.timeEnd('total-scrape');
+        throw error;
+    }
 }
-
 
 router.get('/manga/:id', async (req, res) => {
     const mangaId = req.params.id;

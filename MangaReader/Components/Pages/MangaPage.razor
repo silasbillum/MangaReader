@@ -2,6 +2,7 @@
 @using MangaReader.DomainModels
 @using Service
 @inject MangaService MangaService
+@rendermode InteractiveAuto
 
 <h3>@manga?.Title</h3>
 
@@ -11,7 +12,7 @@
 }
 else
 {
-    <img src="https://mangareader-3.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.CoverImage)" alt="@manga.Title" width="200" />
+    <img loading="lazy" src="https://mangareader-3.onrender.com/api/imageProxy?url=@Uri.EscapeDataString(manga.CoverImage)" alt="@manga.Title" width="200" />
 
     <div class="author">
         <strong>Author(s):</strong>
