@@ -4,11 +4,23 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 require('dotenv').config();
 
+const { LRUCache } = require('lru-cache');
 const ApiKey = require("./middleware/apiKeyMiddleware");
 const mangaSearch = require("./routes/mangaSearch");
 const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
+
+// Cache setup BEFORE any route definitions
+const imageCache = new LRUCache({
+    max: 500,
+    ttl: 1000 * 60 * 10, // 10 minutes
+});
+
+const mangaListCache = new LRUCache({
+    max: 300,
+    ttl: 1000 * 60 * 5, // 5 minutes
+});
 
 const app = express();
 
@@ -38,13 +50,78 @@ const app = express();
     }));
 
     app.use(bodyParser.json());
-
     app.use(ApiKey);
+
+    app.use('/api/manga', (req, res, next) => {
+        console.log('🔔 Incoming /api/manga request:', req.method, req.originalUrl);
+        next();
+    });
 
     app.use('/api/manga', mangaRouter);
     app.use('/api/search', mangaSearch);
 
     app.get('/api/mangaList', dataCollector, pagesValidation, ListManga);
+
+    app.get('/api/mangaList/raw', async (req, res, next) => {
+        const key = `${req.query.type || 'hot'}_${req.query.page || 1}`;
+        const cached = mangaListCache.get(key);
+        if (cached) return res.json(cached);
+
+        try {
+            const data = await ListManga(req, res, true);
+            mangaListCache.set(key, data);
+            res.json(data);
+        } catch (err) {
+            next(err);
+        }
+    });
+
+    app.get('/api/imageProxy', async (req, res) => {
+        const imageUrl = req.query.url;
+        if (!imageUrl || !imageUrl.startsWith('http')) {
+            return res.status(400).send("Invalid or missing 'url' parameter.");
+        }
+
+        const cached = imageCache.get(imageUrl);
+        if (cached) {
+            res.set('Content-Type', cached.contentType);
+            return res.send(cached.buffer);
+        }
+
+        try {
+            const page = await browser.newPage();
+            await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
+            await page.setExtraHTTPHeaders({ 'Referer': 'https://www.mangakakalot.gg' });
+            await page.goto(imageUrl, { waitUntil: 'networkidle2' });
+
+            const imageBuffer = await page.evaluate(async () => {
+                const response = await fetch(window.location.href);
+                const buffer = await response.arrayBuffer();
+                return Array.from(new Uint8Array(buffer));
+            });
+
+            await page.close();
+
+            const ext = imageUrl.split('.').pop().toLowerCase();
+            const contentTypeMap = {
+                webp: 'image/webp',
+                png: 'image/png',
+                gif: 'image/gif',
+                jpg: 'image/jpeg',
+                jpeg: 'image/jpeg',
+            };
+            const contentType = contentTypeMap[ext] || 'image/jpeg';
+            const buffer = Buffer.from(imageBuffer);
+
+            imageCache.set(imageUrl, { buffer, contentType });
+
+            res.set('Content-Type', contentType);
+            res.send(buffer);
+        } catch (err) {
+            console.error("Puppeteer proxy error:", err);
+            res.status(500).send("Image proxy error.");
+        }
+    });
 
     const PORT = process.env.PORT || 10000;
     app.listen(PORT, '0.0.0.0', () => {
