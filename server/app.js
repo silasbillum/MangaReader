@@ -12,8 +12,7 @@ const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
 
-const { LRUCache } = require('lru-cache');
-
+const LRUCache = require('lru-cache').LRUCache;
 
 const app = express();
 
@@ -26,18 +25,19 @@ try {
 }
 
 
+console.log('LRU version:', require('lru-cache/package.json').version);
 console.log('LRU keys:', Object.keys(require('lru-cache')));
 
-const imageCache = new LRUCache({
+
+const imageCache = new LRUCache.LRUCache({
     max: 500,
     ttl: 1000 * 60 * 10, // 10 minutes
 });
 
-const mangaListCache = new LRUCache({
+const mangaListCache = new LRUCache.LRUCache({
     max: 300,
     ttl: 1000 * 60 * 5, // 5 minutes
 });
-
 
 
 (async () => {
