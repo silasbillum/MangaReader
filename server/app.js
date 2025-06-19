@@ -2,7 +2,6 @@ const express = require('express');
 const puppeteer = require('puppeteer');
 const bodyParser = require('body-parser');
 const cors = require('cors');
-const LRUCache = require('lru-cache');
 
 
 require('dotenv').config();
@@ -13,7 +12,18 @@ const dataCollector = require('./middleware/mangaList/dataCollectorMiddleware');
 const pagesValidation = require('./middleware/mangaList/pageValidationMiddleware');
 const ListManga = require('./controllers/ListMangaController');
 
+const LRUCache = require('lru-cache').LRUCache;
+
 const app = express();
+
+
+
+try {
+    console.log('LRUCache keys:', Object.keys(LRUCache));
+} catch (e) {
+    console.error('Failed to inspect lru-cache export:', e);
+}
+
 
 console.log('LRU version:', require('lru-cache/package.json').version);
 console.log('LRU keys:', Object.keys(require('lru-cache')));
