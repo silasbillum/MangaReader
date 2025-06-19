@@ -16,15 +16,6 @@ const ListManga = require('./controllers/ListMangaController');
 
 const app = express();
 
-const imageCache = new LRUCache({
-    max: 500,
-    ttl: 1000 * 60 * 10, // 10 minutes
-});
-
-const mangaListCache = new LRUCache({
-    max: 300,
-    ttl: 1000 * 60 * 5, // 5 minutes
-});
 
 
 
@@ -152,6 +143,15 @@ const mangaListCache = new LRUCache({
 
     console.log('LRU keys:', Object.keys(require('lru-cache')));
 
+    const imageCache = new LRUCache({
+        max: 500,
+        ttl: 1000 * 60 * 10, // 10 minutes
+    });
+
+    const mangaListCache = new LRUCache({
+        max: 300,
+        ttl: 1000 * 60 * 5, // 5 minutes
+    });
 
     // Start the server AFTER everything is set
     const PORT = process.env.PORT || 10000;

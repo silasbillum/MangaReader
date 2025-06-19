@@ -52,7 +52,7 @@ module.exports = (browser) => {
         }
     }
 
-    router.get('/:id', async (req, res) => {
+    router.get('/manga/:id', async (req, res) => {
         const mangaId = req.params.id;
         const cached = mangaDetailCache.get(mangaId);
         if (cached) return res.json(cached);
